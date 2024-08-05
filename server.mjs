@@ -4,7 +4,7 @@ import next from 'next';
 import { Server } from 'socket.io';
 
 import { GCodeProvider } from './server/gcode/gcode-provider.mjs';
-import { TCPClient } from './server/tcp-client.mjs';
+import { tcpClient, TCPClient } from './server/tcp-client.mjs';
 
 const dev = process.env.NODE_ENV !== 'production';
 const hostname = 'localhost';
@@ -12,6 +12,28 @@ const port = 3000;
 // when using middleware `hostname` and `port` must be provided below
 const app = next({ dev, hostname, port });
 const handler = app.getRequestHandler();
+
+// handle process termination
+process.on('exit', () => {
+  console.log('exit event received');
+  process.exit(1);
+});
+process.on('SIGINT', () => {
+  console.log('SIGINT received');
+  process.exit(1);
+});
+process.on('SIGTERM', () => {
+  console.log('SIGTERM received');
+  process.exit(1);
+});
+process.on('uncaughtException', (err, origin) => {
+  console.log(
+    'uncaughtException received',
+    process.stderr.fd,
+    `Caught exception: ${err}\n` + `Exception origin: ${origin}\n`
+  );
+  process.exit(1);
+});
 
 app.prepare().then(() => {
   // connect to GRBL server
@@ -28,6 +50,16 @@ app.prepare().then(() => {
     queryGRBLStatus();
   });
 
+  tcpClient.on('disconnected', () => {
+    console.log('disconnected from GRBL server');
+    tcpClient.close();
+  });
+
+  tcpClient.on('graceful_close', () => {
+    console.log('graceful close');
+    process.exit(1);
+  });
+
   tcpClient.on('error', (err) => {
     console.error(err);
   });
@@ -39,6 +71,8 @@ app.prepare().then(() => {
 
   // handle GRBL responses
   tcpClient.on('data', (data) => {
+    console.log('data:', data);
+    console.log('data length:', data.length);
     if (isGRBLStatus(data)) {
       if (!manualQueryGRBLStatus) {
         broadcast('status', data);

@@ -15,10 +15,22 @@ export class TCPInterface extends EventEmitter {
     this.socket.on('error', this.onError.bind(this));
 
     // close the connection when the server is closed
-    process.on('exit', this.cleanup.bind(this));
-    process.on('SIGINT', this.cleanup.bind(this));
-    process.on('SIGTERM', this.cleanup.bind(this));
-    process.on('uncaughtException', this.cleanup.bind(this));
+    process.on('exit', () => {
+      console.log('TCP: exit event received');
+      this.cleanup.bind(this);
+    });
+    process.on('SIGINT', () => {
+      console.log('TCP: SIGINT received');
+      this.cleanup.bind(this);
+    });
+    process.on('SIGTERM', () => {
+      console.log('TCP: SIGTERM received');
+      this.cleanup.bind(this);
+    });
+    process.on('uncaughtException', () => {
+      console.log('TCP: uncaughtException received');
+      this.cleanup.bind(this);
+    });
   }
 
   connect(host, port) {
@@ -46,10 +58,13 @@ export class TCPInterface extends EventEmitter {
     this.socket.once('close', () => {
       this.isClosing = false;
       clearTimeout(setTimeoutIDClose);
+      this.emit('graceful_close');
+      process.exit(1);
     });
 
     setTimeoutIDClose = setTimeout(() => {
       clearTimeout(setTimeoutIDClose);
+      this.emit('graceful_close');
       process.exit(1);
     }, 5000);
   }
@@ -87,7 +102,7 @@ export class TCPInterface extends EventEmitter {
         break;
       }
 
-      let line = "";
+      let line = '';
       // check if '\r' is the last character
       if (index > 0 && this.buffer[index - 1] === '\r') {
         line = this.buffer.substring(0, index - 1);

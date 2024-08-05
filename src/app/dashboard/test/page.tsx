@@ -181,7 +181,8 @@ export default function Page(): React.JSX.Element {
   };
 
   const onData = (data: string) => {
-    // console.log(data);
+    console.log(data);
+    console.log('length:', data.length);
     consoleGRBL(data);
   };
 

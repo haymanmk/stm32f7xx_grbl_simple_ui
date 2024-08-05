@@ -46,6 +46,7 @@ export class TCPClient extends EventEmitter {
     this.tcpInterface.on('close', this.onClose.bind(this));
     this.tcpInterface.on('data', this.onData.bind(this));
     this.tcpInterface.on('error', this.onError.bind(this));
+    this.tcpInterface.on('graceful_close', this.onGracefulClose.bind(this));
   }
 
   onConnect() {
@@ -72,6 +73,12 @@ export class TCPClient extends EventEmitter {
     this.emit('error', error);
 
     this.errorHandler(error);
+  }
+
+  onGracefulClose() {
+    this.emit('graceful_close');
+
+    this.logging('graceful close');
   }
 
   logging(...args) {
