@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { socket } from '@/socket';
 import DescriptionRoundedIcon from '@mui/icons-material/DescriptionRounded';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
@@ -25,9 +25,11 @@ import { Stack, useMediaQuery, useTheme } from '@mui/system';
 
 import GCodeEditor from '@/components/dashboard/test/gcode-editor';
 import UploadingModal from '@/components/dashboard/test/uploading-modal';
+import { ScatterPlot } from '@/components/scatter-plot';
 
 const MAX_GRBL_DATA_LINES = 60;
 const MAX_CMD_HISTORY = 10;
+const MAX_TRAJECTORY_POINTS = 1000;
 
 export default function Page(): React.JSX.Element {
   const theme = useTheme();
@@ -40,6 +42,7 @@ export default function Page(): React.JSX.Element {
   const [isModalOpenGCodeEdit, setIsModalOpenGCodeEdit] = useState(false);
   const [isModalOpenGCodeUploading, setIsModalOpenGCodeUploading] = useState(false);
   const [gcode, setGCode] = useState('');
+  const [posData, setPosData] = useState<number[][]>([[0, 0]]);
   const grblConsoleRef = useRef<HTMLTextAreaElement>(null);
   const inputCMDRef = useRef<HTMLInputElement>(null);
   const currentInputCMDHistoryNaviIndex = useRef(-1);
@@ -112,6 +115,24 @@ export default function Page(): React.JSX.Element {
           if (currentInputCMDHistoryNaviIndex.current < inputCMDHistory.length - 1) {
             currentInputCMDHistoryNaviIndex.current += 1;
             setInputCMD(inputCMDHistory[currentInputCMDHistoryNaviIndex.current]);
+
+            // send the cursor to the end of the input
+            setTimeout(() => {
+              if (inputCMDRef.current) {
+                const inputLength = inputCMDHistory[currentInputCMDHistoryNaviIndex.current].length;
+                inputCMDRef.current.focus();
+                inputCMDRef.current.setSelectionRange(inputLength, inputLength);
+              }
+            }, 50);
+          } else {
+            // send the cursor to the end of the input
+            setTimeout(() => {
+              if (inputCMDRef.current) {
+                const inputLength = inputCMDHistory[currentInputCMDHistoryNaviIndex.current].length;
+                inputCMDRef.current.focus();
+                inputCMDRef.current.setSelectionRange(inputLength, inputLength);
+              }
+            }, 50);
           }
         }
       } else if (event.key === 'ArrowDown') {
@@ -119,7 +140,17 @@ export default function Page(): React.JSX.Element {
           if (currentInputCMDHistoryNaviIndex.current > 0) {
             currentInputCMDHistoryNaviIndex.current -= 1;
             setInputCMD(inputCMDHistory[currentInputCMDHistoryNaviIndex.current]);
+
+            // send the cursor to the end of the input
+            setTimeout(() => {
+              if (inputCMDRef.current) {
+                const inputLength = inputCMDHistory[currentInputCMDHistoryNaviIndex.current].length;
+                inputCMDRef.current.focus();
+                inputCMDRef.current.setSelectionRange(inputLength, inputLength);
+              }
+            }, 50);
           } else {
+            currentInputCMDHistoryNaviIndex.current = -1;
             setInputCMD('');
           }
         }
@@ -156,9 +187,17 @@ export default function Page(): React.JSX.Element {
       consoleGRBL('Timeout: No response from server');
       setIsModalOpenGCodeUploading(false);
     }, 3000);
-    socket.once('run_gcode', () => {
+    socket.once('run_gcode', (status: boolean) => {
       setIsModalOpenGCodeUploading(false);
       clearTimeout(setTimeoutID);
+      // clear the trajectory
+      setPosData((prev) => {
+        if (prev.length > 1) {
+          return [prev[prev.length - 1]];
+        } else {
+          return prev;
+        }
+      });
     });
     socket.once('error', (error: string) => {
       consoleGRBL(`Error: ${error}`);
@@ -169,6 +208,7 @@ export default function Page(): React.JSX.Element {
     setIsModalOpenGCodeUploading(true);
   }, [gcode]);
 
+  /*** handlers of socket events ***/
   const onConnect = () => {
     setIsSocketConnected(true);
 
@@ -181,12 +221,34 @@ export default function Page(): React.JSX.Element {
   };
 
   const onData = (data: string) => {
-    // console.log(data);
     consoleGRBL(data);
   };
 
   const onStatus = (status: string) => {
     setCurrentGRBLStatus(status);
+
+    // parse current state, if it is in Run state, then update the position data to draw the trajectory
+    const regexRun = /Run/;
+    if (regexRun.test(status)) {
+      const regex = /MPos:(-?\d+\.?\d*),(-?\d+\.?\d*),(-?\d+\.?\d*)/;
+      const match = status.match(regex);
+      if (match) {
+        const x = parseFloat(match[1]);
+        const y = parseFloat(match[2]);
+        // const z = parseFloat(match[3]);
+
+        // debug msg ===>
+        // console.log('x:', x, 'y:', y);
+
+        setPosData((prevData) => {
+          const newData = [...prevData, [x, y]];
+          if (newData.length > MAX_TRAJECTORY_POINTS) {
+            return newData.slice(-MAX_TRAJECTORY_POINTS);
+          }
+          return newData;
+        });
+      }
+    }
   };
 
   const onError = (error: string) => {
@@ -196,6 +258,7 @@ export default function Page(): React.JSX.Element {
   const onReceiveGCode = (data: string) => {
     setGCode(data);
   };
+  /*** handlers of socket events ***/
 
   const consoleGRBL = (data: string) => {
     setGrblData((prevData) => {
@@ -359,6 +422,7 @@ export default function Page(): React.JSX.Element {
           <Skeleton variant="rounded" height="60vh" sx={{ flex: '1 1 20%' }} />
         </Stack>
       )}
+      <ScatterPlot data={posData} width={450} height={450} />
     </Stack>
   );
 }

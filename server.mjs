@@ -6,12 +6,35 @@ import { Server } from 'socket.io';
 import { GCodeProvider } from './server/gcode/gcode-provider.mjs';
 import { TCPClient } from './server/tcp-client.mjs';
 
+const STATUS_INTERVAL = 250;
 const dev = process.env.NODE_ENV !== 'production';
 const hostname = 'localhost';
 const port = 3000;
 // when using middleware `hostname` and `port` must be provided below
 const app = next({ dev, hostname, port });
 const handler = app.getRequestHandler();
+
+// handle process termination
+process.on('exit', () => {
+  console.log('exit event received');
+  process.exit(1);
+});
+process.on('SIGINT', () => {
+  console.log('SIGINT received');
+  process.exit(1);
+});
+process.on('SIGTERM', () => {
+  console.log('SIGTERM received');
+  process.exit(1);
+});
+process.on('uncaughtException', (err, origin) => {
+  console.log(
+    'uncaughtException received',
+    process.stderr.fd,
+    `Caught exception: ${err}\n` + `Exception origin: ${origin}\n`
+  );
+  process.exit(1);
+});
 
 app.prepare().then(() => {
   // connect to GRBL server
@@ -28,6 +51,16 @@ app.prepare().then(() => {
     queryGRBLStatus();
   });
 
+  tcpClient.on('disconnected', () => {
+    console.log('disconnected from GRBL server');
+    tcpClient.close();
+  });
+
+  tcpClient.on('graceful_close', () => {
+    console.log('graceful close');
+    process.exit(1);
+  });
+
   tcpClient.on('error', (err) => {
     console.error(err);
   });
@@ -39,6 +72,7 @@ app.prepare().then(() => {
 
   // handle GRBL responses
   tcpClient.on('data', (data) => {
+    // console.log('data:', data);
     if (isGRBLStatus(data)) {
       if (!manualQueryGRBLStatus) {
         broadcast('status', data);
@@ -49,7 +83,7 @@ app.prepare().then(() => {
       }
     }
     if (!omitOKResponse) broadcast('data', data);
-    else if (isOKResponse) omitOKResponse = false;
+    else if (isOKResponse(data)) omitOKResponse = false;
   });
 
   // monitor status of GRBL server periodically
@@ -59,15 +93,11 @@ app.prepare().then(() => {
       return;
     }
     if (Object.keys(socketClientList).length) {
-      tcpClient.send('?\n', (data, err) => {
-        if (err) {
-          broadcast('error', err);
-        } else {
-          setTimeout(queryGRBLStatus, 1000);
-        }
-      });
+      tcpClient.commandGRBL('?\n')
+      .then((data) => setTimeout(queryGRBLStatus, STATUS_INTERVAL))
+      .catch((err) => broadcast('error', err));
     } else {
-      setTimeout(queryGRBLStatus, 1000);
+      setTimeout(queryGRBLStatus, STATUS_INTERVAL);
     }
   };
 
@@ -114,11 +144,7 @@ app.prepare().then(() => {
         manualQueryGRBLStatus = true;
       }
 
-      tcpClient.send(data + '\n', (data, err) => {
-        if (err) {
-          socket.emit('error', err);
-        }
-      });
+      tcpClient.commandGRBL(data + '\n').catch((err) => socket.emit('error', err));
     });
 
     // handle read gcodes request
@@ -133,7 +159,7 @@ app.prepare().then(() => {
     });
 
     // handle run gcode request
-    socket.on('run_gcode', (gcode) => {
+    socket.on('run_gcode', async (gcode) => {
       if (isGCodeRunning) {
         socket.emit('error', 'GCode is already running');
         return;
@@ -142,8 +168,33 @@ app.prepare().then(() => {
       // ===> debug
       console.log('> run gcode');
 
-      // isGCodeRunning = true;
-      // socket.emit('run_gcode');
+      isGCodeRunning = true;
+      socket.emit('run_gcode', isGCodeRunning);
+
+      // split the gcode into lines by '/n'
+      const lines = gcode.split('\n');
+
+      let hasError = false;
+
+      // send each line to GRBL
+      for (const line of lines) {
+        if (line === '') continue;
+        if (hasError) break;
+
+        // ===> debug
+        console.log('> send gcode:', line);
+
+        try {
+          await tcpClient.commandGRBL(line + '\n');
+        } catch (err) {
+          socket.emit('error', err);
+          console.error(err);
+          hasError = true;
+        }
+      }
+
+      isGCodeRunning = false;
+      socket.emit('run_gcode', isGCodeRunning);
     });
   }
 
