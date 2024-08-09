@@ -5,6 +5,7 @@ import { Server } from 'socket.io';
 
 import { GCodeProvider } from './server/gcode/gcode-provider.mjs';
 import { TCPClient } from './server/tcp-client.mjs';
+import { isGRBLStatus, isOKResponse } from './server/utils.mjs';
 
 const STATUS_INTERVAL = 250;
 const dev = process.env.NODE_ENV !== 'production';
@@ -76,14 +77,15 @@ app.prepare().then(() => {
     if (isGRBLStatus(data)) {
       if (!manualQueryGRBLStatus) {
         broadcast('status', data);
-        omitOKResponse = true;
+        // omitOKResponse = true;
         return;
       } else {
         manualQueryGRBLStatus = false;
       }
     }
-    if (!omitOKResponse) broadcast('data', data);
-    else if (isOKResponse(data)) omitOKResponse = false;
+    broadcast('data', data);
+    // if (!omitOKResponse) broadcast('data', data);
+    // else if (isOKResponse(data)) omitOKResponse = false;
   });
 
   // monitor status of GRBL server periodically
@@ -93,9 +95,10 @@ app.prepare().then(() => {
       return;
     }
     if (Object.keys(socketClientList).length) {
-      tcpClient.commandGRBL('?\n')
-      .then((data) => setTimeout(queryGRBLStatus, STATUS_INTERVAL))
-      .catch((err) => broadcast('error', err));
+      tcpClient
+        .queryGRBLStatus()
+        .then((data) => setTimeout(queryGRBLStatus, STATUS_INTERVAL))
+        .catch((err) => broadcast('error', err));
     } else {
       setTimeout(queryGRBLStatus, STATUS_INTERVAL);
     }
@@ -205,15 +208,3 @@ app.prepare().then(() => {
     }
   };
 });
-
-// check if data is a GRBL status message
-const isGRBLStatus = (data) => {
-  const regex = /<.*>/;
-  return regex.test(data);
-};
-
-// check if there is any 'ok' response from GRBL
-const isOKResponse = (data) => {
-  const regex = /ok/;
-  return regex.test(data);
-};

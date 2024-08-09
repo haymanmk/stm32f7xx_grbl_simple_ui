@@ -1,6 +1,7 @@
 import { EventEmitter } from 'events';
 
 import { TCPInterface } from './tcp-interface.mjs';
+import { isGRBLStatus, isOKResponse } from './utils.mjs';
 
 const DEBUG = false;
 
@@ -42,21 +43,55 @@ export class TCPClient extends EventEmitter {
     this.tcpInterface.close();
   }
 
+  /**
+   * This function sends a command to the GRBL server
+   * and waits for 'ok' or 'error' responses.
+   * @param {*} data 
+   * @returns 
+   */
   commandGRBL(data) {
     return new Promise(async (resolve, reject) => {
       await this.lock();
 
-      this.tcpInterface.send(data, (response, err) => {
-        this.unlock();
+      const onData = (rsv, rjt) => {
+        // create an once event listener for the "data" event
+        this.once('data', (_data) => {
+          if (_data.includes('error')) {
+            this.unlock();
+            rjt(_data); // reject
+          } else if (_data.includes('ok')) {
+            this.unlock();
+            rsv(_data); // resolve
+          } else {
+            onData(rsv, rjt);
+          }
+        });
+      };
 
-        if (err) {
-          reject(err);
-        } else {
-          resolve(response);
-        }
-      });
+      this.tcpInterface.send(data);
+
+      onData(resolve, reject);
     });
   }
+
+  queryGRBLStatus() {
+    return new Promise((resolve, reject) => {
+      const onData = (rsv, rjt) => {
+        // create an once event listener for the "data" event
+        this.once('data', (_data) => {
+          if (isGRBLStatus(_data)) {
+            rsv(_data); // resolve
+          } else {
+            onData(rsv, rjt);
+          }
+        });
+      }
+
+      this.tcpInterface.send('?');
+
+      onData(resolve, reject);
+  });
+}
 
   initTCPInterfaceEventHandlers() {
     this.tcpInterface.on('connect', this.onConnect.bind(this));

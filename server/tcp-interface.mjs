@@ -78,11 +78,11 @@ export class TCPInterface extends EventEmitter {
 
     if (callback) {
       // create an once event listener for the "data" event
-      this.once('data', (data) => {
-        if (data.includes('error')) {
-          callback(data, new Error("GRBL did not respond with 'ok'"));
+      this.once('data', (_data) => {
+        if (_data.includes('error')) {
+          callback(_data, new Error("GRBL did not respond with 'ok'"));
         } else {
-          callback(data);
+          callback(_data);
         }
       });
     }
