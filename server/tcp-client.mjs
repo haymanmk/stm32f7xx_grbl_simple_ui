@@ -15,6 +15,7 @@ export class TCPClient extends EventEmitter {
 
     // initialize state
     this.state = { connected: false };
+    this.lockSend = false;
 
     // create tcp interface
     this.tcpInterface = new TCPInterface();
@@ -39,6 +40,22 @@ export class TCPClient extends EventEmitter {
 
   close() {
     this.tcpInterface.close();
+  }
+
+  commandGRBL(data) {
+    return new Promise(async (resolve, reject) => {
+      await this.lock();
+
+      this.tcpInterface.send(data, (response, err) => {
+        this.unlock();
+
+        if (err) {
+          reject(err);
+        } else {
+          resolve(response);
+        }
+      });
+    });
   }
 
   initTCPInterfaceEventHandlers() {
@@ -79,6 +96,22 @@ export class TCPClient extends EventEmitter {
     this.emit('graceful_close');
 
     this.logging('graceful close');
+  }
+
+  lock() {
+    return new Promise((resolve) => {
+      const setIntervalID = setInterval(() => {
+        if (!this.lockSend) {
+          this.lockSend = true;
+          clearInterval(setIntervalID);
+          resolve();
+        }
+      }, 100);
+    });
+  }
+
+  unlock() {
+    this.lockSend = false;
   }
 
   logging(...args) {
