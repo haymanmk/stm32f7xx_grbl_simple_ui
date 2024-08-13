@@ -194,6 +194,7 @@ app.prepare().then(() => {
             hasError = true;
           }
         }
+        console.log('cycle:', i + 1);
       }
 
       isGCodeRunning = false;
