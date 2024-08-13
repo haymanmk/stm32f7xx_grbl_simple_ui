@@ -59,13 +59,11 @@ export class TCPInterface extends EventEmitter {
       this.isClosing = false;
       clearTimeout(setTimeoutIDClose);
       this.emit('graceful_close');
-      process.exit(1);
     });
 
     setTimeoutIDClose = setTimeout(() => {
       clearTimeout(setTimeoutIDClose);
       this.emit('graceful_close');
-      process.exit(1);
     }, 5000);
   }
 

@@ -42,6 +42,7 @@ export default function Page(): React.JSX.Element {
   const [isModalOpenGCodeEdit, setIsModalOpenGCodeEdit] = useState(false);
   const [isModalOpenGCodeUploading, setIsModalOpenGCodeUploading] = useState(false);
   const [gcode, setGCode] = useState('');
+  const [gcodeCycles, setGCodeCycles] = useState(1);
   const [posData, setPosData] = useState<number[][]>([[0, 0]]);
   const grblConsoleRef = useRef<HTMLTextAreaElement>(null);
   const inputCMDRef = useRef<HTMLInputElement>(null);
@@ -180,8 +181,12 @@ export default function Page(): React.JSX.Element {
     setGCode(event.target.value);
   }, []);
 
+  const onChangeCycles = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+    setGCodeCycles(parseInt(event.target.value));
+  }, []);
+
   const onRun = useCallback(() => {
-    socket.emit('run_gcode', gcode);
+    socket.emit('run_gcode', gcode, gcodeCycles);
     // set timeout in case no response from server
     const setTimeoutID = setTimeout(() => {
       consoleGRBL('Timeout: No response from server');
@@ -206,7 +211,7 @@ export default function Page(): React.JSX.Element {
     });
     setIsModalOpenGCodeEdit(false);
     setIsModalOpenGCodeUploading(true);
-  }, [gcode]);
+  }, [gcode, gcodeCycles]);
 
   /*** handlers of socket events ***/
   const onConnect = () => {
@@ -410,7 +415,9 @@ export default function Page(): React.JSX.Element {
           <GCodeEditor
             open={isModalOpenGCodeEdit}
             gcode={gcode}
+            cycles={gcodeCycles}
             onChangeGCode={onChangeGCode}
+            onChangeCycles={onChangeCycles}
             onClose={() => setIsModalOpenGCodeEdit(false)}
             onRun={onRun}
           />

@@ -21,7 +21,7 @@ export class TCPClient extends EventEmitter {
     // create tcp interface
     this.tcpInterface = new TCPInterface();
 
-    this.tcpInterface.connect(HOST, PORT);
+    this.connectGRBL();
 
     // arrange event handlers for tcp interface events
     this.initTCPInterfaceEventHandlers();
@@ -43,11 +43,19 @@ export class TCPClient extends EventEmitter {
     this.tcpInterface.close();
   }
 
+  connectGRBL() {
+    if (this.state.connected) {
+      return;
+    }
+
+    this.tcpInterface.connect(HOST, PORT);
+  }
+
   /**
    * This function sends a command to the GRBL server
    * and waits for 'ok' or 'error' responses.
-   * @param {*} data 
-   * @returns 
+   * @param {*} data
+   * @returns
    */
   commandGRBL(data) {
     return new Promise(async (resolve, reject) => {
@@ -85,13 +93,13 @@ export class TCPClient extends EventEmitter {
             onData(rsv, rjt);
           }
         });
-      }
+      };
 
       this.tcpInterface.send('?');
 
       onData(resolve, reject);
-  });
-}
+    });
+  }
 
   initTCPInterfaceEventHandlers() {
     this.tcpInterface.on('connect', this.onConnect.bind(this));
@@ -113,6 +121,9 @@ export class TCPClient extends EventEmitter {
     this.emit('disconnected');
 
     this.logging('disconnected from tcp server');
+
+    // retry to connect to the server
+    setTimeout(() => this.connectGRBL(), 1000);
   }
 
   onData(data) {

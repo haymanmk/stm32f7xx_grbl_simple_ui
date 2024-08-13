@@ -1,24 +1,30 @@
 import * as React from 'react';
-import { Button, Modal, OutlinedInput, Paper, Stack } from '@mui/material';
+import { Button, Modal, OutlinedInput, Paper, Stack, TextField } from '@mui/material';
 
 const style = {
   position: 'absolute' as 'absolute',
   top: '50%',
   left: '50%',
   transform: 'translate(-50%, -50%)',
-  width: 400,
+  maxWidth: '50vw',
+  maxHeight: '80vh',
+  overflow: 'auto',
 };
 
 export default function GCodeEditor({
   open,
   gcode,
+  cycles,
   onChangeGCode,
+  onChangeCycles,
   onClose,
   onRun,
 }: {
   open: boolean;
   gcode: string;
+  cycles: number;
   onChangeGCode: (event: React.ChangeEvent<HTMLInputElement>) => void;
+  onChangeCycles: (event: React.ChangeEvent<HTMLInputElement>) => void;
   onClose: () => void;
   onRun: () => void;
 }): React.JSX.Element {
@@ -35,13 +41,23 @@ export default function GCodeEditor({
             id="g-code-editor"
             placeholder="Paste G-Code Here"
             multiline
-            rows={20}
+            rows={15}
             value={gcode}
             onChange={onChangeGCode}
           />
-          <Button variant="contained" onClick={onRun}>
-            RUN
-          </Button>
+          <Stack direction={'row'} spacing={3} sx={{ justifyContent: 'center' }}>
+            <TextField
+              id="num_cycles"
+              variant="outlined"
+              label="Cycles"
+              value={cycles}
+              onChange={onChangeCycles}
+              type="number"
+            />
+            <Button variant="contained" onClick={onRun}>
+              RUN
+            </Button>
+          </Stack>
         </Stack>
       </Paper>
     </Modal>

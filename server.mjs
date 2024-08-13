@@ -52,18 +52,13 @@ app.prepare().then(() => {
     queryGRBLStatus();
   });
 
-  tcpClient.on('disconnected', () => {
-    console.log('disconnected from GRBL server');
-    tcpClient.close();
-  });
-
   tcpClient.on('graceful_close', () => {
     console.log('graceful close');
     process.exit(1);
   });
 
   tcpClient.on('error', (err) => {
-    console.error(err);
+    console.log('error', err);
   });
 
   tcpClient.on('disconnected', () => {
@@ -162,7 +157,7 @@ app.prepare().then(() => {
     });
 
     // handle run gcode request
-    socket.on('run_gcode', async (gcode) => {
+    socket.on('run_gcode', async (gcode, gcode_cycles) => {
       if (isGCodeRunning) {
         socket.emit('error', 'GCode is already running');
         return;
@@ -179,20 +174,25 @@ app.prepare().then(() => {
 
       let hasError = false;
 
-      // send each line to GRBL
-      for (const line of lines) {
-        if (line === '') continue;
-        if (hasError) break;
+      const gcodeCycles = parseInt(gcode_cycles) || 1;
 
-        // ===> debug
-        console.log('> send gcode:', line);
+      // repeat the gcode cycles
+      for (let i = 0; i < gcodeCycles; i++) {
+        // send each line to GRBL
+        for (const line of lines) {
+          if (line === '') continue;
+          if (hasError) break;
 
-        try {
-          await tcpClient.commandGRBL(line + '\n');
-        } catch (err) {
-          socket.emit('error', err);
-          console.error(err);
-          hasError = true;
+          // ===> debug
+          console.log('> send gcode:', line);
+
+          try {
+            await tcpClient.commandGRBL(line + '\n');
+          } catch (err) {
+            socket.emit('error', err);
+            console.error(err);
+            hasError = true;
+          }
         }
       }
 
