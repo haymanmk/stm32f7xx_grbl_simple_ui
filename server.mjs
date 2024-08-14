@@ -49,7 +49,7 @@ app.prepare().then(() => {
   tcpClient.on('connected', () => {
     console.log('connected to GRBL server');
     isGRBLConnected = true;
-    queryGRBLStatus();
+    setTimeout(() => queryGRBLStatus(), 1000);
   });
 
   tcpClient.on('graceful_close', () => {

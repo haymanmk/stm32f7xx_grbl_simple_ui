@@ -124,6 +124,9 @@ export class TCPClient extends EventEmitter {
 
     // retry to connect to the server
     setTimeout(() => this.connectGRBL(), 1000);
+
+    // unlock the lock
+    this.unlock();
   }
 
   onData(data) {
