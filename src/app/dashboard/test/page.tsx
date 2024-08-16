@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { socket } from '@/socket';
 import DescriptionRoundedIcon from '@mui/icons-material/DescriptionRounded';
+import FormatListBulletedRoundedIcon from '@mui/icons-material/FormatListBulletedRounded';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import KeyboardArrowLeftIcon from '@mui/icons-material/KeyboardArrowLeft';
 import KeyboardArrowRightIcon from '@mui/icons-material/KeyboardArrowRight';
@@ -26,6 +27,7 @@ import { Stack, useMediaQuery, useTheme } from '@mui/system';
 import GCodeEditor from '@/components/dashboard/test/gcode-editor';
 import UploadingModal from '@/components/dashboard/test/uploading-modal';
 import { ScatterPlot } from '@/components/scatter-plot';
+import IOMonitor from '@/components/dashboard/test/io-monitor';
 
 const MAX_GRBL_DATA_LINES = 60;
 const MAX_CMD_HISTORY = 10;
@@ -39,14 +41,17 @@ export default function Page(): React.JSX.Element {
   const [inputCMD, setInputCMD] = useState('');
   const [inputCMDHistory, setInputCMDHistory] = useState<string[]>([]);
   const [currentGRBLStatus, setCurrentGRBLStatus] = useState('');
+  const [isModalOpenIOMonitor, setIsModalOpenIOMonitor] = useState(false);
   const [isModalOpenGCodeEdit, setIsModalOpenGCodeEdit] = useState(false);
   const [isModalOpenGCodeUploading, setIsModalOpenGCodeUploading] = useState(false);
   const [gcode, setGCode] = useState('');
   const [gcodeCycles, setGCodeCycles] = useState(1);
   const [posData, setPosData] = useState<number[][]>([[0, 0]]);
+  const [ioData, setIOData] = useState<number>(0);
   const grblConsoleRef = useRef<HTMLTextAreaElement>(null);
   const inputCMDRef = useRef<HTMLInputElement>(null);
   const currentInputCMDHistoryNaviIndex = useRef(-1);
+  const skipOKResponse = useRef(false);
 
   useEffect(() => {
     if (socket.connected) {
@@ -165,7 +170,7 @@ export default function Page(): React.JSX.Element {
     };
   }, [inputCMDRef.current, inputCMDHistory]);
 
-  const commandGRBL = useCallback((cmd: string) => {
+  const commandGRBL = useCallback((cmd: string | number) => {
     // send a command to GRBL
     if (socket.connected) {
       socket.emit('cmd', cmd);
@@ -226,6 +231,16 @@ export default function Page(): React.JSX.Element {
   };
 
   const onData = (data: string) => {
+    if (data.includes('IO:')) {
+      skipOKResponse.current = true;
+      return;
+    }
+
+    if (skipOKResponse.current) {
+      skipOKResponse.current = false;
+      return;
+    }
+
     consoleGRBL(data);
   };
 
@@ -282,154 +297,161 @@ export default function Page(): React.JSX.Element {
       <div>
         <Typography variant="h4">Test</Typography>
       </div>
-      {isSocketConnected ? (
-        <Stack
-          direction={{ xs: 'column', sm: 'row' }}
-          spacing={3}
-          sx={{ justifyContent: 'center', alignItems: 'stretch' }}
-        >
-          <Card sx={{ display: 'flex', flexDirection: 'column', flex: '1 1 20%' }}>
-            <CardHeader subheader="unit test" title="Manual" />
-            <Divider />
-            <CardContent sx={{ marginBottom: 'auto' }}>
-              <Stack direction="column" spacing={3}>
-                <Grid container spacing={3} wrap="wrap" sx={{ justifyContent: 'center' }}>
-                  <Grid item>
-                    <Button variant="contained" onClick={() => commandGRBL('?')}>
-                      ?
-                    </Button>
-                  </Grid>
-                  <Grid item>
-                    <Button variant="contained" onClick={() => commandGRBL('$$')}>
-                      $$
-                    </Button>
-                  </Grid>
-                  <Grid item>
-                    <Button variant="contained" onClick={() => commandGRBL('$X')}>
-                      $X
-                    </Button>
-                  </Grid>
-                  <Grid item>
-                    <Button variant="contained" onClick={() => commandGRBL('$H')}>
-                      $H
-                    </Button>
-                  </Grid>
-                  <Grid item>
-                    <Button
-                      variant="contained"
-                      startIcon={<DescriptionRoundedIcon />}
-                      onClick={() => setIsModalOpenGCodeEdit(true)}
-                    >
-                      G-Code
-                    </Button>
-                  </Grid>
+      <Stack
+        direction={{ xs: 'column', sm: 'row' }}
+        spacing={3}
+        sx={{ justifyContent: 'center', alignItems: 'stretch' }}
+      >
+        <Card sx={{ display: 'flex', flexDirection: 'column', flex: '1 1 20%' }}>
+          <CardHeader subheader="unit test" title="Manual" />
+          <Divider />
+          <CardContent sx={{ marginBottom: 'auto' }}>
+            <Stack direction="column" spacing={3}>
+              <Grid container spacing={3} wrap="wrap" sx={{ justifyContent: 'center' }}>
+                <Grid item>
+                  <Button variant="contained" onClick={() => commandGRBL('?')}>
+                    ?
+                  </Button>
                 </Grid>
-                <Divider variant="middle" />
-                <Stack direction="row" spacing={3} sx={{ justifyContent: 'center' }}>
+                <Grid item>
+                  <Button variant="contained" onClick={() => commandGRBL('$$')}>
+                    $$
+                  </Button>
+                </Grid>
+                <Grid item>
+                  <Button variant="contained" onClick={() => commandGRBL('$X')}>
+                    $X
+                  </Button>
+                </Grid>
+                <Grid item>
+                  <Button variant="contained" onClick={() => commandGRBL('$H')}>
+                    $H
+                  </Button>
+                </Grid>
+                <Grid item>
                   <Button
                     variant="contained"
-                    startIcon={<KeyboardArrowUpIcon />}
-                    onClick={() => commandGRBL('$J=G91 Z0.1 F100')}
+                    startIcon={<FormatListBulletedRoundedIcon />}
+                    onClick={() =>setIsModalOpenIOMonitor(true)}
                   >
-                    Z+
+                    I/O
                   </Button>
+                </Grid>
+                <Grid item>
                   <Button
                     variant="contained"
-                    startIcon={<KeyboardArrowUpIcon />}
-                    onClick={() => commandGRBL('$J=G91 Y0.1 F100')}
+                    startIcon={<DescriptionRoundedIcon />}
+                    onClick={() => setIsModalOpenGCodeEdit(true)}
                   >
-                    Y+
+                    G-Code
                   </Button>
-                  <Button
-                    variant="contained"
-                    startIcon={<KeyboardArrowDownIcon />}
-                    onClick={() => commandGRBL('$J=G91 Z-0.1 F100')}
-                  >
-                    Z-
-                  </Button>
-                </Stack>
-                <Stack direction="row" spacing={3} sx={{ justifyContent: 'center' }}>
-                  <Button
-                    variant="contained"
-                    startIcon={<KeyboardArrowLeftIcon />}
-                    onClick={() => commandGRBL('$J=G91 X0.1 F100')}
-                  >
-                    X+
-                  </Button>
-                  <Button
-                    variant="contained"
-                    startIcon={<KeyboardArrowDownIcon />}
-                    onClick={() => commandGRBL('$J=G91 Y-0.1 F100')}
-                  >
-                    Y-
-                  </Button>
-                  <Button
-                    variant="contained"
-                    startIcon={<KeyboardArrowRightIcon />}
-                    onClick={() => commandGRBL('$J=G91 X-0.1 F100')}
-                  >
-                    X-
-                  </Button>
-                </Stack>
+                </Grid>
+              </Grid>
+              <Divider variant="middle" />
+              <Stack direction="row" spacing={3} sx={{ justifyContent: 'center' }}>
+                <Button
+                  variant="contained"
+                  startIcon={<KeyboardArrowUpIcon />}
+                  onClick={() => commandGRBL('$J=G91 Z0.1 F100')}
+                >
+                  Z+
+                </Button>
+                <Button
+                  variant="contained"
+                  startIcon={<KeyboardArrowUpIcon />}
+                  onClick={() => commandGRBL('$J=G91 Y0.1 F100')}
+                >
+                  Y+
+                </Button>
+                <Button
+                  variant="contained"
+                  startIcon={<KeyboardArrowDownIcon />}
+                  onClick={() => commandGRBL('$J=G91 Z-0.1 F100')}
+                >
+                  Z-
+                </Button>
               </Stack>
-            </CardContent>
-            <Divider />
-            <CardActions sx={{ marginTop: 0 }}>
-              <Box
-                component="p"
-                sx={{
-                  fontSize: '0.6rem',
-                  lineHeight: '0.6rem',
-                  ml: '0.5rem',
-                  color: 'var(--mui-palette-text-secondary)',
-                }}
-              >
-                {`Status: ${currentGRBLStatus}`}
-              </Box>
-            </CardActions>
-          </Card>
-          {isLargerThanBreakpoint && <Divider orientation="vertical" flexItem variant="middle" />}
-          <Card sx={{ flex: '1 1 20%' }}>
-            <CardContent>
-              <Stack direction="column" spacing={3}>
-                <TextField
-                  inputRef={grblConsoleRef}
-                  id="multiline-display"
-                  multiline
-                  rows={20}
-                  value={grblData}
-                  disabled
-                  inputProps={{ style: { fontSize: '0.6rem', lineHeight: '0.8rem' } }}
-                />
-                <OutlinedInput
-                  inputRef={inputCMDRef}
-                  id="singleline-input"
-                  placeholder="Type and Press Enter to Go"
-                  value={inputCMD}
-                  onChange={onChangeInputCMD}
-                  disabled={!isSocketConnected}
-                />
+              <Stack direction="row" spacing={3} sx={{ justifyContent: 'center' }}>
+                <Button
+                  variant="contained"
+                  startIcon={<KeyboardArrowLeftIcon />}
+                  onClick={() => commandGRBL('$J=G91 X0.1 F100')}
+                >
+                  X+
+                </Button>
+                <Button
+                  variant="contained"
+                  startIcon={<KeyboardArrowDownIcon />}
+                  onClick={() => commandGRBL('$J=G91 Y-0.1 F100')}
+                >
+                  Y-
+                </Button>
+                <Button
+                  variant="contained"
+                  startIcon={<KeyboardArrowRightIcon />}
+                  onClick={() => commandGRBL('$J=G91 X-0.1 F100')}
+                >
+                  X-
+                </Button>
               </Stack>
-            </CardContent>
-          </Card>
-          <GCodeEditor
-            open={isModalOpenGCodeEdit}
-            gcode={gcode}
-            cycles={gcodeCycles}
-            onChangeGCode={onChangeGCode}
-            onChangeCycles={onChangeCycles}
-            onClose={() => setIsModalOpenGCodeEdit(false)}
-            onRun={onRun}
-          />
-          <UploadingModal open={isModalOpenGCodeUploading} onClose={() => {}} />
-        </Stack>
-      ) : (
-        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={3} sx={{ justifyContent: 'center' }}>
-          <Skeleton variant="rounded" height="60vh" sx={{ flex: '1 1 20%' }} />
-          <Skeleton variant="rounded" height="60vh" sx={{ flex: '1 1 20%' }} />
-        </Stack>
-      )}
-      <ScatterPlot data={posData} width={450} height={450} />
+            </Stack>
+          </CardContent>
+          <Divider />
+          <CardActions sx={{ marginTop: 0 }}>
+            <Box
+              component="p"
+              sx={{
+                fontSize: '0.6rem',
+                lineHeight: '0.6rem',
+                ml: '0.5rem',
+                color: 'var(--mui-palette-text-secondary)',
+              }}
+            >
+              {`Status: ${currentGRBLStatus}`}
+            </Box>
+          </CardActions>
+        </Card>
+        {isLargerThanBreakpoint && <Divider orientation="vertical" flexItem variant="middle" />}
+        <Card sx={{ flex: '1 1 20%' }}>
+          <CardContent>
+            <Stack direction="column" spacing={3}>
+              <TextField
+                inputRef={grblConsoleRef}
+                id="multiline-display"
+                multiline
+                rows={20}
+                value={grblData}
+                disabled
+                inputProps={{ style: { fontSize: '0.6rem', lineHeight: '0.8rem' } }}
+              />
+              <OutlinedInput
+                inputRef={inputCMDRef}
+                id="singleline-input"
+                placeholder="Type and Press Enter to Go"
+                value={inputCMD}
+                onChange={onChangeInputCMD}
+                disabled={!isSocketConnected}
+              />
+            </Stack>
+          </CardContent>
+        </Card>
+        <IOMonitor open={isModalOpenIOMonitor} socket={socket} onClose={() => setIsModalOpenIOMonitor(false)} />
+        <GCodeEditor
+          open={isModalOpenGCodeEdit}
+          gcode={gcode}
+          cycles={gcodeCycles}
+          onChangeGCode={onChangeGCode}
+          onChangeCycles={onChangeCycles}
+          onClose={() => setIsModalOpenGCodeEdit(false)}
+          onRun={onRun}
+        />
+        <UploadingModal open={isModalOpenGCodeUploading} onClose={() => {}} />
+      </Stack>
+      <Card>
+        <CardContent>
+          <ScatterPlot data={posData} width={450} height={450} />
+        </CardContent>
+      </Card>
     </Stack>
   );
 }

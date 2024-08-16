@@ -142,7 +142,23 @@ app.prepare().then(() => {
         manualQueryGRBLStatus = true;
       }
 
-      tcpClient.commandGRBL(data + '\n').catch((err) => socket.emit('error', err));
+      let buf;
+
+      if (typeof data === 'number') {
+        if (data >= 0 && data <= 255) {
+          buf = Buffer.from([data]);
+        }
+        else {
+          socket.emit('error', 'Invalid data');
+          return;
+        }
+      }
+      else if (typeof data === 'string') {
+        buf = Buffer.from(data);
+      }
+      buf = Buffer.concat([buf, Buffer.from('\n')]);
+
+      tcpClient.commandGRBL(buf).catch((err) => socket.emit('error', err));
     });
 
     // handle read gcodes request

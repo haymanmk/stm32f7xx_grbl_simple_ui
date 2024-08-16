@@ -9,6 +9,8 @@ export class TCPInterface extends EventEmitter {
 
     this.socket = new Socket();
     this.socket.setEncoding('utf8');
+    this.socket.setKeepAlive(true, 3000);
+    this.socket.setTimeout(5000);
     this.socket.on('data', this.onData.bind(this));
     this.socket.on('connect', this.onConnect.bind(this));
     this.socket.on('close', this.onClose.bind(this));
@@ -41,6 +43,12 @@ export class TCPInterface extends EventEmitter {
 
     console.log(`connecting to ${host}:${port}`);
     this.socket.connect(port, host);
+
+    this.setTimeoutIDConnect = setTimeout(() => {
+      console.log('connection timeout');
+      this.isConnecting = false;
+      this.connect(host, port);
+    }, 3000);
   }
 
   close() {
@@ -113,6 +121,9 @@ export class TCPInterface extends EventEmitter {
   }
 
   onConnect() {
+    if (this.setTimeoutIDConnect) {
+      clearTimeout(this.setTimeoutIDConnect);
+    }
     this.isConnected = true;
     this.isConnecting = false;
     this.isClosing = false;
@@ -120,6 +131,9 @@ export class TCPInterface extends EventEmitter {
   }
 
   onClose() {
+    if (this.setTimeoutIDConnect) {
+      clearTimeout(this.setTimeoutIDConnect);
+    }
     this.isConnected = false;
     this.isConnecting = false;
     this.isClosing = false;
@@ -131,6 +145,15 @@ export class TCPInterface extends EventEmitter {
     this.isConnecting = false;
     this.isClosing = false;
     this.emit('error', err);
+  }
+
+  onTimeout() {
+    this.isConnected = false;
+    this.isConnecting = false;
+    this.isClosing = false;
+    this.emit('timeout');
+
+    this.close();
   }
 
   logging(...args) {
