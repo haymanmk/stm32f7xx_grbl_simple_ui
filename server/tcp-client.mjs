@@ -59,26 +59,31 @@ export class TCPClient extends EventEmitter {
    */
   commandGRBL(data) {
     return new Promise(async (resolve, reject) => {
-      await this.lock();
+      try {
+        await this.lock();
 
-      const onData = (rsv, rjt) => {
-        // create an once event listener for the "data" event
-        this.once('data', (_data) => {
-          if (_data.includes('error')) {
-            this.unlock();
-            rjt(_data); // reject
-          } else if (_data.includes('ok')) {
-            this.unlock();
-            rsv(_data); // resolve
-          } else {
-            onData(rsv, rjt);
-          }
-        });
-      };
+        const onData = (rsv, rjt) => {
+          // create an once event listener for the "data" event
+          this.once('data', (_data) => {
+            if (_data.includes('error')) {
+              this.unlock();
+              rjt(_data); // reject
+            } else if (_data.includes('ok')) {
+              this.unlock();
+              rsv(_data); // resolve
+            } else {
+              onData(rsv, rjt);
+            }
+          });
+        };
 
-      this.tcpInterface.send(data);
+        this.tcpInterface.send(data);
 
-      onData(resolve, reject);
+        onData(resolve, reject);
+      } catch (err) {
+        this.unlock();
+        reject(err);
+      }
     });
   }
 
@@ -124,9 +129,6 @@ export class TCPClient extends EventEmitter {
 
     // retry to connect to the server
     setTimeout(() => this.connectGRBL(), 1000);
-
-    // unlock the lock
-    this.unlock();
   }
 
   onData(data) {
@@ -148,9 +150,12 @@ export class TCPClient extends EventEmitter {
   }
 
   lock() {
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
       const setIntervalID = setInterval(() => {
-        if (!this.lockSend) {
+        if (this.state.connected === false) {
+          clearInterval(setIntervalID);
+          reject('tcp server is not connected');
+        } else if (!this.lockSend) {
           this.lockSend = true;
           clearInterval(setIntervalID);
           resolve();
