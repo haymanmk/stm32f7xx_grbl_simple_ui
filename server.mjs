@@ -136,7 +136,7 @@ app.prepare().then(() => {
         return;
       }
 
-      console.log('cmd:', data);
+      console.log('rev cmd:', data); // debug log <=====
 
       if (data === '?') {
         manualQueryGRBLStatus = true;
@@ -147,18 +147,19 @@ app.prepare().then(() => {
       if (typeof data === 'number') {
         if (data >= 0 && data <= 255) {
           buf = Buffer.from([data]);
-        }
-        else {
+        } else {
           socket.emit('error', 'Invalid data');
           return;
         }
-      }
-      else if (typeof data === 'string') {
+      } else if (typeof data === 'string') {
         buf = Buffer.from(data);
       }
       buf = Buffer.concat([buf, Buffer.from('\n')]);
 
-      tcpClient.commandGRBL(buf).catch((err) => socket.emit('error', err));
+      tcpClient
+        .commandGRBL(buf)
+        .then((_data) => console.log('cmd', data, _data)) // degug log =====>
+        .catch((err) => socket.emit('error', err));
     });
 
     // handle read gcodes request

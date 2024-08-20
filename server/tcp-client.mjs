@@ -59,29 +59,37 @@ export class TCPClient extends EventEmitter {
    */
   commandGRBL(data) {
     return new Promise(async (resolve, reject) => {
+      let timeoutID;
+
       try {
         await this.lock();
 
-        const onData = (rsv, rjt) => {
+        const onData = (_data) => {
           // create an once event listener for the "data" event
-          this.once('data', (_data) => {
-            if (_data.includes('error')) {
-              this.unlock();
-              rjt(_data); // reject
-            } else if (_data.includes('ok')) {
-              this.unlock();
-              rsv(_data); // resolve
-            } else {
-              onData(rsv, rjt);
-            }
-          });
+          if (_data.includes('error')) {
+            this.unlock();
+            clearTimeout(timeoutID);
+            reject(_data); // reject
+          } else if (_data.includes('ok')) {
+            this.unlock();
+            clearTimeout(timeoutID);
+            resolve(_data); // resolve
+          } else {
+            this.once('data', onData);
+          }
         };
 
         this.tcpInterface.send(data);
+        timeoutID = setTimeout(() => {
+          this.unlock();
+          this.off('data', onData);
+          reject(new Error('TIMEOUT: GRBL did not respond with "ok"'));
+        }, 3000);
 
-        onData(resolve, reject);
+        this.once('data', onData);
       } catch (err) {
         this.unlock();
+        clearTimeout(timeoutID);
         reject(err);
       }
     });
