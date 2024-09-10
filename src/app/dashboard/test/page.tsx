@@ -25,9 +25,9 @@ import {
 import { Stack, useMediaQuery, useTheme } from '@mui/system';
 
 import GCodeEditor from '@/components/dashboard/test/gcode-editor';
+import IOMonitor from '@/components/dashboard/test/io-monitor';
 import UploadingModal from '@/components/dashboard/test/uploading-modal';
 import { ScatterPlot } from '@/components/scatter-plot';
-import IOMonitor from '@/components/dashboard/test/io-monitor';
 
 const MAX_GRBL_DATA_LINES = 60;
 const MAX_CMD_HISTORY = 10;
@@ -250,7 +250,7 @@ export default function Page(): React.JSX.Element {
     // parse current state, if it is in Run state, then update the position data to draw the trajectory
     const regexRun = /Run/;
     if (regexRun.test(status)) {
-      const regex = /MPos:(-?\d+\.?\d*),(-?\d+\.?\d*),(-?\d+\.?\d*)/;
+      const regex = /EPos:(-?\d+\.?\d*),(-?\d+\.?\d*),(-?\d+\.?\d*)/;
       const match = status.match(regex);
       if (match) {
         const x = parseFloat(match[1]);
@@ -332,7 +332,7 @@ export default function Page(): React.JSX.Element {
                   <Button
                     variant="contained"
                     startIcon={<FormatListBulletedRoundedIcon />}
-                    onClick={() =>setIsModalOpenIOMonitor(true)}
+                    onClick={() => setIsModalOpenIOMonitor(true)}
                   >
                     I/O
                   </Button>
