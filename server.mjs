@@ -64,6 +64,8 @@ app.prepare().then(() => {
   tcpClient.on('disconnected', () => {
     console.log('disconnected from GRBL server');
     isGRBLConnected = false;
+    // clear all listeners
+    tcpClient.removeAllListeners();
   });
 
   // handle GRBL responses
