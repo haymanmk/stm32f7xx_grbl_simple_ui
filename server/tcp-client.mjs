@@ -98,6 +98,12 @@ export class TCPClient extends EventEmitter {
   queryGRBLStatus() {
     return new Promise((resolve, reject) => {
       const onData = (rsv, rjt) => {
+        // set timeout
+        let timeoutID = setTimeout(() => {
+          this.off('data', onData);
+          rjt(new Error('TIMEOUT: GRBL did not respond with status'));
+        }, 3000);
+
         // create an once event listener for the "data" event
         this.once('data', (_data) => {
           if (isGRBLStatus(_data)) {
@@ -105,6 +111,8 @@ export class TCPClient extends EventEmitter {
           } else {
             onData(rsv, rjt);
           }
+          // clear timeout
+          clearTimeout(timeoutID);
         });
       };
 

@@ -28,14 +28,14 @@ process.on('SIGTERM', () => {
   console.log('SIGTERM received');
   process.exit(1);
 });
-process.on('uncaughtException', (err, origin) => {
-  console.log(
-    'uncaughtException received',
-    process.stderr.fd,
-    `Caught exception: ${err}\n` + `Exception origin: ${origin}\n`
-  );
-  process.exit(1);
-});
+// process.on('uncaughtException', (err, origin) => {
+//   console.log(
+//     'uncaughtException received',
+//     process.stderr.fd,
+//     `Caught exception: ${err}\n` + `Exception origin: ${origin}\n`
+//   );
+//   process.exit(1);
+// });
 
 app.prepare().then(() => {
   // connect to GRBL server
@@ -45,6 +45,9 @@ app.prepare().then(() => {
   let omitOKResponse = false;
   let socketClientList = {};
   let isGCodeRunning = false;
+
+  // debug message
+  console.log('=============================== Next.js is ready ===============================');
 
   tcpClient.on('connected', () => {
     console.log('connected to GRBL server');
@@ -65,7 +68,7 @@ app.prepare().then(() => {
     console.log('disconnected from GRBL server');
     isGRBLConnected = false;
     // clear all listeners
-    tcpClient.removeAllListeners();
+    // tcpClient.removeAllListeners();
   });
 
   // handle GRBL responses
@@ -95,7 +98,10 @@ app.prepare().then(() => {
       tcpClient
         .queryGRBLStatus()
         .then((data) => setTimeout(queryGRBLStatus, STATUS_INTERVAL))
-        .catch((err) => broadcast('error', err));
+        .catch((err) => {
+          broadcast('error', err);
+          setTimeout(queryGRBLStatus, STATUS_INTERVAL);
+        });
     } else {
       setTimeout(queryGRBLStatus, STATUS_INTERVAL);
     }

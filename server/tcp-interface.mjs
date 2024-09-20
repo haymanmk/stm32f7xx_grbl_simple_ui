@@ -42,13 +42,20 @@ export class TCPInterface extends EventEmitter {
     this.isConnecting = true;
 
     console.log(`connecting to ${host}:${port}`);
-    this.socket.connect(port, host);
 
-    this.setTimeoutIDConnect = setTimeout(() => {
-      console.log('connection timeout');
+    try {
+      this.socket.connect(port, host);
+
+      this.setTimeoutIDConnect = setTimeout(() => {
+        console.log('connection timeout');
+        this.isConnecting = false;
+        this.connect(host, port);
+      }, 3000);
+    } catch (error) {
+      console.error(error);
       this.isConnecting = false;
       this.connect(host, port);
-    }, 3000);
+    }
   }
 
   close() {
