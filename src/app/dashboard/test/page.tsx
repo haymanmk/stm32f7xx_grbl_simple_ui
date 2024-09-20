@@ -210,7 +210,7 @@ export default function Page(): React.JSX.Element {
       });
     });
     socket.once('error', (error: string) => {
-      consoleGRBL(`Error: ${error}`);
+      onError(error);
       setIsModalOpenGCodeUploading(false);
       clearTimeout(setTimeoutID);
     });
@@ -271,8 +271,12 @@ export default function Page(): React.JSX.Element {
     }
   };
 
-  const onError = (error: string) => {
-    consoleGRBL(`Error: ${error}`);
+  const onError = (error: string | object) => {
+    let strError = error;
+    if (error instanceof Error) {
+      strError = error.message;
+    }
+    consoleGRBL(`Error: ${strError}`);
   };
 
   const onReceiveGCode = (data: string) => {
@@ -282,7 +286,16 @@ export default function Page(): React.JSX.Element {
 
   const consoleGRBL = (data: string) => {
     setGrblData((prevData) => {
-      let newData = prevData + data + '\n';
+      let strData;
+      try {
+        // stringified JSON or any other data
+        strData = typeof data === 'object' ? JSON.stringify(data) : data;
+      } catch (error) {
+        // string data
+        strData = data;
+      }
+
+      let newData = prevData + strData + '\n';
       const lines = newData.split('\n');
       if (lines.length > MAX_GRBL_DATA_LINES) {
         const newLines = lines.slice(-MAX_GRBL_DATA_LINES);

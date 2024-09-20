@@ -28,14 +28,14 @@ process.on('SIGTERM', () => {
   console.log('SIGTERM received');
   process.exit(1);
 });
-// process.on('uncaughtException', (err, origin) => {
-//   console.log(
-//     'uncaughtException received',
-//     process.stderr.fd,
-//     `Caught exception: ${err}\n` + `Exception origin: ${origin}\n`
-//   );
-//   process.exit(1);
-// });
+process.on('uncaughtException', (err, origin) => {
+  console.log(
+    'uncaughtException received',
+    process.stderr.fd,
+    `Caught exception: ${err}\n` + `Exception origin: ${origin}\n`
+  );
+  // process.exit(1);
+});
 
 app.prepare().then(() => {
   // connect to GRBL server
@@ -167,7 +167,7 @@ app.prepare().then(() => {
       tcpClient
         .commandGRBL(buf)
         .then((_data) => console.log('cmd', data, _data)) // degug log =====>
-        .catch((err) => socket.emit('error', err));
+        .catch((err) => socket.emit('error', convertErrorToString(err)));
     });
 
     // handle read gcodes request
@@ -177,7 +177,7 @@ app.prepare().then(() => {
           socket.emit('gcodes', gcodes);
         })
         .catch((err) => {
-          socket.emit('error', err);
+          socket.emit('error', convertErrorToString(err));
         });
     });
 
@@ -214,7 +214,7 @@ app.prepare().then(() => {
           try {
             await tcpClient.commandGRBL(line + '\n');
           } catch (err) {
-            socket.emit('error', err);
+            socket.emit('error', convertErrorToString(err));
             console.error(err);
             hasError = true;
           }
@@ -234,3 +234,7 @@ app.prepare().then(() => {
     }
   };
 });
+
+function convertErrorToString(err) {
+  return err instanceof Error ? err.message : err;
+}

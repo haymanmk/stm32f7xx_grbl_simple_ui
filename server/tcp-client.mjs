@@ -84,7 +84,7 @@ export class TCPClient extends EventEmitter {
           this.unlock();
           this.off('data', onData);
           reject(new Error('TIMEOUT: GRBL did not respond with "ok"'));
-        }, 3000);
+        }, 6000);
 
         this.once('data', onData);
       } catch (err) {
