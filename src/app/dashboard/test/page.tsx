@@ -342,6 +342,11 @@ export default function Page(): React.JSX.Element {
                   </Button>
                 </Grid>
                 <Grid item>
+                  <Button variant="contained" onClick={() => commandGRBL(0x85)}>
+                    !JOG
+                  </Button>
+                </Grid>
+                <Grid item>
                   <Button
                     variant="contained"
                     startIcon={<FormatListBulletedRoundedIcon />}
